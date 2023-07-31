@@ -9,29 +9,33 @@ namespace RunGroopWebApp.Controllers
 {
     public class RaceController : Controller
     {
-        private readonly IRaceRepository _raceRespository;
+        private readonly IRaceRepository _raceRepository;
         private readonly IPhotoService _photoService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public RaceController(IRaceRepository raceRespository, IPhotoService photoService)
+        public RaceController(IRaceRepository raceRepository, IPhotoService photoService, IHttpContextAccessor httpContextAccessor)
         {
-            _raceRespository = raceRespository;
+            _raceRepository = raceRepository;
             _photoService = photoService;
+            _httpContextAccessor = httpContextAccessor;
         }
         public async Task<IActionResult> Index()
         {
-            IEnumerable<Race> races = await _raceRespository.GetAll();
+            IEnumerable<Race> races = await _raceRepository.GetAll();
             return View(races);
         }
 
         public async Task<IActionResult> Detail(int id)
         {
-            Race race = await _raceRespository.GetByIdAsync(id);
+            Race race = await _raceRepository.GetByIdAsync(id);
             return View(race);
         }
 
         public IActionResult Create()
         {
-            return View();
+            var curUserID = _httpContextAccessor.HttpContext?.User.GetUserId();
+            var createRaceViewModel = new CreateRaceViewModel { AppUserId = curUserID };
+            return View(createRaceViewModel);
         }
 
         [HttpPost]
@@ -46,6 +50,7 @@ namespace RunGroopWebApp.Controllers
                     Title = raceVM.Title,
                     Description = raceVM.Description,
                     Image = result.Url.ToString(),
+                    AppUserId = raceVM.AppUserId,
                     Address = new Address
                     {
                         Street = raceVM.Address.Street,
@@ -53,7 +58,7 @@ namespace RunGroopWebApp.Controllers
                         State = raceVM.Address.State,
                     }
                 };
-                _raceRespository.Add(race);
+                _raceRepository.Add(race);
                 return RedirectToAction("Index");
             }
             else
@@ -66,7 +71,7 @@ namespace RunGroopWebApp.Controllers
 
         public async Task<IActionResult> Edit(int id)
         {
-            var race = await _raceRespository.GetByIdAsync(id);
+            var race = await _raceRepository.GetByIdAsync(id);
             if (race == null) return View("Error");
             var clubVM = new EditRaceViewModel
             {
@@ -89,7 +94,7 @@ namespace RunGroopWebApp.Controllers
                 return View("Edit", raceVM);
             }
 
-            var userRace = await _raceRespository.GetByIdAsyncNoTracking(id);
+            var userRace = await _raceRepository.GetByIdAsyncNoTracking(id);
 
             if (userRace != null)
             {
@@ -115,7 +120,7 @@ namespace RunGroopWebApp.Controllers
                     Address = raceVM.Address,
                 };
 
-                _raceRespository.Update(race);
+                _raceRepository.Update(race);
 
                 return RedirectToAction("Index");
             }
@@ -123,8 +128,23 @@ namespace RunGroopWebApp.Controllers
             {
                 return View(raceVM);
             }
+        }
 
+        public async Task<IActionResult> Delete(int id)
+        {
+            var clubDetails = await _raceRepository.GetByIdAsync(id);
+            if (clubDetails == null) return View("Error");
+            return View(clubDetails);
+        }
 
+        [HttpPost, ActionName("Delete")]
+        public async Task<IActionResult> DeleteClub(int id)
+        {
+            var raceDetails = await _raceRepository.GetByIdAsync(id);
+            if (raceDetails == null) return View("Error");
+
+            _raceRepository.Delete(raceDetails);
+            return RedirectToAction("Index");
         }
     }
 }
